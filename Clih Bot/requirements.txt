@@ -1,0 +1,5 @@
+gradio
+pyautogui
+opencv-python
+cryptography
+pyyaml  # For config parsing
