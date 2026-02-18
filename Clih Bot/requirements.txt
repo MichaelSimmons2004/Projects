@@ -1,5 +1,6 @@
 gradio
 pyautogui
+Pillow
 opencv-python
 cryptography
-pyyaml  # For config parsing
+pyyaml

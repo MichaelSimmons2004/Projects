@@ -1,0 +1,6 @@
+# Default configuration for LocalAI Copilot
+# This file is for reference only — the active config is stored encrypted in config.enc
+response_style: detailed
+ethical_guidelines: none
+model: placeholder
+plugins_enabled: true
