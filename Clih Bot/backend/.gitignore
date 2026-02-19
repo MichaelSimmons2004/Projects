@@ -1,0 +1,21 @@
+# Environment — never commit secrets or local paths
+.env
+
+# Terminal session logs — may contain command history, file contents, credentials
+sessions/*.log
+sessions/.current
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+venv/
+.venv/
+
+# Test artifacts
+.pytest_cache/
+*.egg-info/
+dist/
+build/

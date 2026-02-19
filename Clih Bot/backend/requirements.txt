@@ -1,0 +1,40 @@
+# LMStudio Python SDK (WebSocket protocol — needed for KV cache quantization config,
+# which is not exposed by the REST API or lms CLI)
+lmstudio>=1.5.0
+
+# Core API server
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+websockets==14.1
+aiohttp==3.11.11
+
+# LLM client (LMStudio uses OpenAI-compatible API)
+openai==1.58.1
+
+# Token counting
+tiktoken==0.8.0
+
+# Screen capture
+mss==9.0.2
+Pillow==11.0.0
+
+# Browser DevTools Protocol (raw WebSocket used instead; websockets already listed above)
+# pycdp==0.2.0  # optional, not required — we use raw WebSocket CDP
+
+# File system watching (terminal log mode)
+watchdog==6.0.0
+
+# PTY wrapper (terminal PTY mode - Unix/Linux primarily)
+ptyprocess==0.7.0
+
+# Environment / config
+python-dotenv==1.0.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# Optional: OCR for non-vision models
+# pytesseract==0.3.13
+
+# Optional: for window enumeration on Windows
+# pywin32==308

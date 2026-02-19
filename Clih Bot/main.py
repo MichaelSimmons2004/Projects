@@ -2,7 +2,7 @@ import gradio as gr
 import yaml
 import os
 from pathlib import Path
-from ai_engine import get_ai_response  # Placeholder AI
+from ai_engine import get_ai_response, get_ai_response_stream
 from storage import load_config, save_config  # Encrypted storage
 from observation import analyze_screen  # Stub for screen observation
 
@@ -13,10 +13,10 @@ config = load_config()
 
 # Mock chat function (replace with real AI later)
 def chat_handler(message, history):
-    # Apply user config (e.g., style)
-    style = config.get('response_style', 'concise')
-    response = get_ai_response(message)  # Calls placeholder
-    return f"{style.capitalize()} response: {response}"
+    accumulated = ""
+    for chunk in get_ai_response_stream(message):
+        accumulated += chunk
+        yield accumulated
 
 # Function to update config
 def update_config(new_yaml):
