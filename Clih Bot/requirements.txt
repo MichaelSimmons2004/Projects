@@ -1,6 +1,39 @@
+# ── GUI ───────────────────────────────────────────────────────────────────────
 gradio
 pyautogui
-Pillow
 opencv-python
 cryptography
 pyyaml
+
+# ── Backend: API server ───────────────────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+websockets==14.1
+aiohttp==3.11.11
+
+# ── Backend: LMStudio ─────────────────────────────────────────────────────────
+# SDK uses internal WebSocket protocol — exposes KV cache quantization config
+# not available via the REST API or lms CLI
+lmstudio>=1.5.0
+openai==1.58.1
+
+# ── Backend: Context & tokens ─────────────────────────────────────────────────
+tiktoken==0.8.0
+
+# ── Backend: Screen capture ───────────────────────────────────────────────────
+mss==9.0.2
+Pillow==11.0.0
+
+# ── Backend: File system & terminal watching ──────────────────────────────────
+watchdog==6.0.0
+ptyprocess==0.7.0
+
+# ── Backend: Config ───────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# ── Optional ──────────────────────────────────────────────────────────────────
+# pytesseract==0.3.13   # OCR for non-vision models
+# pywin32==308          # window enumeration on Windows

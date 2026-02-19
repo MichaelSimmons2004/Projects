@@ -22,25 +22,14 @@ import httpx
 BACKEND_URL = "http://localhost:8765"
 _STARTUP_TIMEOUT = 120   # seconds to wait for the backend to come up
 
-_THIS_DIR  = Path(__file__).parent
-_BACKEND_DIR  = _THIS_DIR / "backend"
-# Use the backend's own venv if present, otherwise fall back to the current interpreter.
-_BACKEND_PYTHON = _BACKEND_DIR / "venv" / "Scripts" / "python.exe"   # Windows
-_BACKEND_PYTHON_UNIX = _BACKEND_DIR / "venv" / "bin" / "python"      # Mac / Linux
-_BACKEND_MAIN  = _BACKEND_DIR / "main.py"
+_THIS_DIR    = Path(__file__).parent
+_BACKEND_DIR = _THIS_DIR / "backend"
+_BACKEND_MAIN = _BACKEND_DIR / "main.py"
 
 # ── Internal state ────────────────────────────────────────────────────────────
 
 _start_lock: threading.Lock = threading.Lock()
 _backend_proc: subprocess.Popen | None = None   # noqa: UP007  (compat)
-
-
-def _pick_python() -> str:
-    """Return the best Python executable for the backend."""
-    for candidate in (_BACKEND_PYTHON, _BACKEND_PYTHON_UNIX):
-        if candidate.exists():
-            return str(candidate)
-    return sys.executable
 
 
 def _healthy() -> bool:
@@ -64,7 +53,7 @@ def _ensure_backend() -> None:
         if _healthy():
             return
 
-        python = _pick_python()
+        python = sys.executable
         print(
             f"[CLIHBot] Backend not running — starting it now …\n"
             f"          python : {python}\n"
