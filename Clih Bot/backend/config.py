@@ -44,9 +44,9 @@ class Settings(BaseSettings):
 
     # ── LMStudio / Model ──────────────────────────────────────────────────────
     lmstudio_base_url: str = "http://localhost:1234/v1"
-    lmstudio_model: str = "local-model"
+    lmstudio_model: str = "qwen/qwen3-vl-8b"
     lmstudio_api_key: str = "lm-studio"
-    model_vision_capable: bool = False
+    model_vision_capable: bool = True
 
     # ── LMStudio auto-launch ──────────────────────────────────────────────────
     # Automatically start LMStudio's server if it isn't already running.
@@ -74,7 +74,7 @@ class Settings(BaseSettings):
     model_v_cache_quant: str = "q8_0"
 
     # ── Context Window ────────────────────────────────────────────────────────
-    context_window_tokens: int = 55_000
+    context_window_tokens: int = 40_000
     response_reserve_tokens: int = 4_096
     tool_result_max_tokens: int = 5_000
     terminal_context_lines: int = 100
