@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     # Note: V cache quantization requires flash_attention=True (always enabled here).
     model_k_cache_quant: str = "q8_0"
     model_v_cache_quant: str = "q8_0"
+    # Enforce KV quantization by requiring the LM Studio Python SDK path.
+    # If true and K/V quant is configured, REST fallback is refused.
+    lmstudio_require_sdk_for_kv_quant: bool = True
 
     # ── Context Window ────────────────────────────────────────────────────────
     context_window_tokens: int = 40_000

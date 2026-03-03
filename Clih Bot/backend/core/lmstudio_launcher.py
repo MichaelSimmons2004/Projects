@@ -166,6 +166,15 @@ class LMStudioLauncher:
             import lmstudio
             from lmstudio import LlmLoadModelConfig
         except ImportError:
+            if self._kv_quant_enforced():
+                msg = (
+                    "LM Studio SDK is required to enforce KV cache quantization "
+                    f"(MODEL_K_CACHE_QUANT={self._settings.model_k_cache_quant!r}, "
+                    f"MODEL_V_CACHE_QUANT={self._settings.model_v_cache_quant!r}). "
+                    "Install 'lmstudio' in the same Python environment running CLIHBot."
+                )
+                logger.error(msg)
+                return {"status": "error", "error": msg, "via": "lmstudio_sdk"}
             logger.warning("lmstudio SDK not installed; falling back to REST API load.")
             return self._rest_load_sync(model)
 
@@ -201,11 +210,25 @@ class LMStudioLauncher:
                 logger.info("Model '%s' loaded (instance_id=%s).", model, getattr(info, "instance_id", "?"))
                 return {"status": "loaded", "model": model, "via": "lmstudio_sdk"}
         except Exception as exc:
-            logger.error("SDK load failed for '%s': %s — trying REST fallback.", model, exc)
+            if self._kv_quant_enforced():
+                msg = (
+                    f"SDK load failed for '{model}': {exc}. "
+                    "Refusing REST fallback because LMSTUDIO_REQUIRE_SDK_FOR_KV_QUANT=true."
+                )
+                logger.error(msg)
+                return {"status": "error", "error": msg, "via": "lmstudio_sdk"}
+            logger.error("SDK load failed for '%s': %s - trying REST fallback.", model, exc)
             return self._rest_load_sync(model)
 
     def _rest_load_sync(self, model: str) -> dict[str, Any]:
         """Fallback: load via the REST /api/v1/models/load endpoint (no KV quant)."""
+        if self._kv_quant_enforced():
+            msg = (
+                "REST model load blocked: KV quantization is enforced and requires LM Studio SDK. "
+                "Set LMSTUDIO_REQUIRE_SDK_FOR_KV_QUANT=false to allow REST fallback."
+            )
+            logger.error(msg)
+            return {"status": "error", "error": msg, "via": "rest_api"}
         import urllib.request, json as _json
         s = self._settings
         mgmt = s.lmstudio_management_url
@@ -272,6 +295,12 @@ class LMStudioLauncher:
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
+    def _kv_quant_enforced(self) -> bool:
+        """Return True when configured KV quantization must not fall back to REST load."""
+        s = self._settings
+        has_kv_quant = bool((s.model_k_cache_quant or "").strip() or (s.model_v_cache_quant or "").strip())
+        return bool(s.lmstudio_require_sdk_for_kv_quant and has_kv_quant)
+
     async def _server_responding(self) -> bool:
         """Return True if the LMStudio HTTP API answers a models request."""
         url = f"{self._settings.lmstudio_base_url}/models"
@@ -331,3 +360,4 @@ def get_launcher() -> LMStudioLauncher:
     if _launcher is None:
         _launcher = LMStudioLauncher()
     return _launcher
+
