@@ -1,11 +1,14 @@
 """
-CLIHBot — Cybersecurity pair-programmer AI agent.
-Entry point: starts the API server and background services.
+CLIHBot backend entry point.
+
+Starts the FastAPI server plus background services. The canonical UI for this
+integration lives in `Clih Bot/main.py`, so this process stays API-only.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 
 import uvicorn
@@ -20,14 +23,25 @@ logging.basicConfig(
 logger = logging.getLogger("clihbot")
 
 
-async def _ensure_lmstudio() -> None:
-    """
-    Auto-start LMStudio's server and pre-load the model if configured to do so.
-    Runs before the HTTP server opens so the first chat request is never blocked
-    waiting for LMStudio to come up.
-    """
+async def _ensure_llm_server() -> None:
+    """Auto-start LM Studio when needed and leave preferred external servers alone."""
     settings = get_settings()
+
+    from core.model_manager import get_model_manager
+    manager = get_model_manager()
+
+    if settings.auto_detect_external_server:
+        external_url, server_type = await manager._detect_external_servers()
+        if external_url and settings.prefer_external_servers:
+            logger.info(
+                "Detected external server %s (%s) - skipping LM Studio auto-start",
+                external_url,
+                server_type or "openai-compatible",
+            )
+            return
+
     if not settings.lmstudio_auto_start:
+        logger.debug("LM Studio auto-start disabled")
         return
 
     from core.lmstudio_launcher import get_launcher
@@ -36,14 +50,12 @@ async def _ensure_lmstudio() -> None:
     result = await launcher.ensure_running()
     if result.get("status") == "error":
         logger.warning(
-            "LMStudio auto-start failed: %s\n"
-            "  You can still start LMStudio manually — CLIHBot will connect when it's up.",
+            "LM Studio auto-start failed: %s. You can still start LM Studio manually; "
+            "CLIHBot will connect when it is up.",
             result.get("error", "unknown error"),
         )
         return
 
-    # If we just started the server (or it was already up) and auto_load is on,
-    # kick off model loading in the background so it's warm by the first request.
     if settings.model_auto_load:
         async def _preload() -> None:
             try:
@@ -62,7 +74,6 @@ async def _start_background_services() -> None:
     """Start any long-running background tasks (terminal watcher, extension WS server)."""
     settings = get_settings()
 
-    # Terminal watcher
     try:
         from tools.terminal_watcher import TerminalWatcher
         watcher = TerminalWatcher(settings)
@@ -71,7 +82,6 @@ async def _start_background_services() -> None:
     except Exception as exc:
         logger.warning("Terminal watcher could not start: %s", exc)
 
-    # Browser extension WebSocket relay
     try:
         from tools.browser_extension import ExtensionRelay
         relay = ExtensionRelay(settings)
@@ -82,13 +92,13 @@ async def _start_background_services() -> None:
 
 
 def main() -> None:
+    os.environ["CLIHBOT_EMBEDDED_BACKEND"] = "1"
     settings = get_settings()
 
     logger.info("Starting CLIHBot API server on %s:%d", settings.api_host, settings.api_port)
-    logger.info("LMStudio endpoint: %s  model: %s", settings.lmstudio_base_url, settings.lmstudio_model)
+    logger.info("LLM server endpoint: %s  model: %s", settings.lmstudio_base_url, settings.lmstudio_model)
     logger.info("Context window: %d tokens", settings.context_window_tokens)
 
-    # Import app here to avoid circular imports at module load time
     from api.server import create_app
 
     app = create_app()
@@ -104,7 +114,7 @@ def main() -> None:
     server = uvicorn.Server(uvicorn_config)
 
     async def _run() -> None:
-        await _ensure_lmstudio()
+        await _ensure_llm_server()
         await _start_background_services()
         await server.serve()
 

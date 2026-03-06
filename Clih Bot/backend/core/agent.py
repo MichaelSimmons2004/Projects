@@ -62,7 +62,9 @@ class Agent:
         """
         # Ensure the model is loaded before we try to call it
         from core.model_manager import get_model_manager
-        await get_model_manager().ensure_loaded()
+        manager = get_model_manager()
+        await manager.ensure_loaded()
+        await _ensure_chat_backend_ready(manager, self._settings)
 
         # Add user message to history
         self._ctx.add({"role": "user", "content": user_message})
@@ -116,7 +118,9 @@ class Agent:
         model is re-invoked for a streaming final answer.
         """
         from core.model_manager import get_model_manager
-        await get_model_manager().ensure_loaded()
+        manager = get_model_manager()
+        await manager.ensure_loaded()
+        await _ensure_chat_backend_ready(manager, self._settings)
 
         self._ctx.add({"role": "user", "content": user_message})
         system_prompt = build_system_prompt(context_snapshot)
@@ -221,6 +225,25 @@ def _assistant_tool_call_msg(msg: Any) -> dict[str, Any]:
         "content": msg.content,
         "tool_calls": tool_calls,
     }
+
+
+async def _ensure_chat_backend_ready(manager: Any, settings: Any) -> None:
+    """Raise an actionable error if no live model server is available for chat."""
+    status = await manager.status()
+    if status.get("loaded"):
+        return
+
+    server_url = status.get("server_url") or settings.lmstudio_base_url
+    if settings.lmstudio_auto_start:
+        raise RuntimeError(
+            f"No model is currently available at {server_url}. "
+            "Start your external server or load a model in LM Studio, then try again."
+        )
+
+    raise RuntimeError(
+        f"No model server is currently available at {server_url}, and LM Studio auto-start is disabled. "
+        "Start your external server or enable LM Studio auto-start in Preferences or backend/.env."
+    )
 
 
 class _FakeFunction:

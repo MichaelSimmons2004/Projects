@@ -23,9 +23,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -94,6 +96,7 @@ class LMStudioLauncher:
         self._settings = get_settings()
         self._lms: Path | None = None          # resolved `lms` path
         self._we_started_it: bool = False      # did we launch it this session?
+        self._estimate_cache: dict[tuple[str, int], tuple[float, dict[str, Any]]] = {}
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -253,6 +256,14 @@ class LMStudioLauncher:
 
     async def list_available_models(self) -> list[str]:
         """Return models available on disk (not necessarily loaded)."""
+        entries = await self.list_available_model_entries()
+        return [
+            m.get("modelKey") or m.get("path") or str(m)
+            for m in entries
+        ]
+
+    async def list_available_model_entries(self) -> list[dict[str, Any]]:
+        """Return raw LM Studio model entries from `lms ls --json`."""
         lms = self._lms or _find_lms()
         if not lms:
             return []
@@ -267,13 +278,55 @@ class LMStudioLauncher:
             if result.returncode == 0:
                 import json
                 data = json.loads(result.stdout)
-                return [
-                    m.get("modelKey") or m.get("path") or str(m)
-                    for m in (data if isinstance(data, list) else data.get("models", []))
-                ]
+                entries = data if isinstance(data, list) else data.get("models", [])
+                return [m for m in entries if isinstance(m, dict)]
         except Exception as exc:
             logger.debug("lms ls failed: %s", exc)
         return []
+
+    async def estimate_model_memory(self, model_key: str, context_length: int) -> dict[str, Any]:
+        """Return LM Studio's own memory estimate for a model/context pair."""
+        cache_key = (model_key, int(context_length))
+        cached = self._estimate_cache.get(cache_key)
+        now = time.time()
+        if cached and now - cached[0] < 60:
+            return cached[1]
+
+        lms = self._lms or _find_lms()
+        if not lms:
+            return {"error": "LM Studio CLI not found"}
+
+        def _run() -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [str(lms), "load", "--estimate-only", model_key, "--context-length", str(int(context_length))],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(None, _run)
+            combined_output = "\n".join(
+                part for part in [result.stdout.strip(), result.stderr.strip()] if part
+            )
+            gpu_match = re.search(r"Estimated GPU Memory:\s+([0-9.]+)\s+GiB", combined_output)
+            total_match = re.search(r"Estimated Total Memory:\s+([0-9.]+)\s+GiB", combined_output)
+            context_match = re.search(r"Context Length:\s+([0-9,]+)", combined_output)
+            if not gpu_match and not total_match:
+                return {"error": (combined_output or "estimate failed").strip()}
+
+            estimate = {
+                "model": model_key,
+                "context_length": int(context_match.group(1).replace(",", "")) if context_match else int(context_length),
+                "estimated_gpu_memory_gib": float(gpu_match.group(1)) if gpu_match else None,
+                "estimated_total_memory_gib": float(total_match.group(1)) if total_match else None,
+                "raw": combined_output.strip(),
+                "return_code": result.returncode,
+            }
+            self._estimate_cache[cache_key] = (now, estimate)
+            return estimate
+        except Exception as exc:
+            return {"error": str(exc)}
 
     async def stop_server(self) -> bool:
         """Stop the LMStudio server (only if LMSTUDIO_STOP_ON_EXIT is set)."""

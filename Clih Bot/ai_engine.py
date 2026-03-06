@@ -1,39 +1,26 @@
-"""
-ai_engine.py — CLIHBot backend bridge.
-
-Replaces the original mock placeholder.  Forwards every chat message to the
-CLIHBot FastAPI backend (http://localhost:8765/chat) and returns the real AI
-response.  If the backend isn't running yet this module starts it automatically
-in a background process and waits for it to come up — the user never needs to
-launch a second terminal.
-"""
 from __future__ import annotations
 
 import subprocess
 import sys
 import threading
 import time
+import os
 from pathlib import Path
 
 import httpx
 
-# ── Config ────────────────────────────────────────────────────────────────────
+BACKEND_URL = os.getenv("CLIHBOT_API_BASE_URL", "http://localhost:8765")
+_STARTUP_TIMEOUT = 120
 
-BACKEND_URL = "http://localhost:8765"
-_STARTUP_TIMEOUT = 120   # seconds to wait for the backend to come up
-
-_THIS_DIR    = Path(__file__).parent
+_THIS_DIR = Path(__file__).parent
 _BACKEND_DIR = _THIS_DIR / "backend"
 _BACKEND_MAIN = _BACKEND_DIR / "main.py"
 
-# ── Internal state ────────────────────────────────────────────────────────────
-
 _start_lock: threading.Lock = threading.Lock()
-_backend_proc: subprocess.Popen | None = None   # noqa: UP007  (compat)
+_backend_proc: subprocess.Popen | None = None
 
 
 def _healthy() -> bool:
-    """Return True if the backend responds to /health."""
     try:
         r = httpx.get(f"{BACKEND_URL}/health", timeout=3)
         return r.status_code == 200
@@ -42,20 +29,24 @@ def _healthy() -> bool:
 
 
 def _ensure_backend() -> None:
-    """Start the backend process if it isn't already running."""
     global _backend_proc
 
     if _healthy():
         return
 
+    if os.environ.get("CLIHBOT_EMBEDDED_BACKEND") == "1":
+        raise RuntimeError(
+            "CLIHBot backend is running, but the chat API is unavailable. "
+            "Check the backend log for the underlying error."
+        )
+
     with _start_lock:
-        # Re-check under the lock in case another thread already started it.
         if _healthy():
             return
 
         python = sys.executable
         print(
-            f"[CLIHBot] Backend not running — starting it now …\n"
+            f"[CLIHBot] Backend not running - starting it now...\n"
             f"          python : {python}\n"
             f"          main   : {_BACKEND_MAIN}",
             flush=True,
@@ -64,12 +55,10 @@ def _ensure_backend() -> None:
         _backend_proc = subprocess.Popen(
             [python, str(_BACKEND_MAIN)],
             cwd=str(_BACKEND_DIR),
-            # Inherit stdio so backend logs show in the same terminal
             stdout=None,
             stderr=None,
         )
 
-        # Wait until the backend accepts requests.
         deadline = time.monotonic() + _STARTUP_TIMEOUT
         while time.monotonic() < deadline:
             if _healthy():
@@ -83,13 +72,8 @@ def _ensure_backend() -> None:
         )
 
 
-# ── Public API (called by main.py) ────────────────────────────────────────────
 
 def get_ai_response_stream(message: str):
-    """
-    Generator that yields response chunks as they arrive from the backend.
-    Use this with Gradio's streaming ChatInterface (yield from a generator fn).
-    """
     try:
         _ensure_backend()
     except Exception as exc:
@@ -97,6 +81,7 @@ def get_ai_response_stream(message: str):
         return
 
     import json as _json
+
     try:
         with httpx.stream(
             "POST",
@@ -118,11 +103,8 @@ def get_ai_response_stream(message: str):
         yield f"[Backend error: {exc}]"
 
 
+
 def get_ai_response(message: str) -> str:
-    """
-    Send *message* to the CLIHBot backend and return the assistant's reply.
-    Starts the backend automatically on the first call if needed.
-    """
     try:
         _ensure_backend()
     except Exception as exc:
@@ -132,7 +114,7 @@ def get_ai_response(message: str) -> str:
         r = httpx.post(
             f"{BACKEND_URL}/chat",
             json={"message": message},
-            timeout=180,   # model inference can be slow on CPU
+            timeout=180,
         )
         r.raise_for_status()
         return r.json()["response"]
