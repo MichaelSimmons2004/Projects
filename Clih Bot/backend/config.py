@@ -123,7 +123,7 @@ class Settings(BaseSettings):
 
     # ── Model Selector / Ranking ──────────────────────────────────────────────
     # Model ranking mode: 'auto' for smart selection, 'manual' to respect only explicit selection
-    model_ranking_mode: str = "auto"
+    model_ranking_mode: str = "manual"
     # Prefer models with larger context windows when multiple options available
     prefer_larger_context: bool = True
     # Maximum VRAM to use for model selection (in MB), None for unlimited

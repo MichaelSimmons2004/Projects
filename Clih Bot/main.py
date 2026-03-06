@@ -285,7 +285,7 @@ def load_model_selection_settings():
     bootstrap = api_request("/model/selector/bootstrap")
     if "error" in bootstrap:
         return (
-            "auto",
+            "manual",
             True,
             None,
             150000,
@@ -321,7 +321,7 @@ def load_model_selection_settings():
         else:
             gpu_message = f"Detected `{gpu_name}`, but VRAM totals are unavailable."
     return (
-        ranking.get("mode", config.get("ranking_mode", "auto")),
+        ranking.get("mode", config.get("ranking_mode", "manual")),
         config.get("prefer_larger_context", True),
         configured_budget if configured_budget not in (None, "") else live_budget,
         config.get("context_target_tokens", config.get("min_context_tokens", 150000)),
@@ -652,7 +652,7 @@ with gr.Blocks(title="LocalAI Copilot") as app:
             ranking_mode_dropdown = gr.Dropdown(
                 label="Ranking Mode",
                 choices=["auto", "manual"],
-                value="auto",
+                value="manual",
             )
             prefer_larger_context_selector = gr.Checkbox(label="Prefer larger context windows")
         with gr.Row():
