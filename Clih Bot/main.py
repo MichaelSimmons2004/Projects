@@ -42,14 +42,38 @@ def list_plugins():
 
 # Build the UI
 with gr.Blocks(title="LocalAI Copilot") as app:
-    gr.Markdown("# LocalAI Copilot - UI Prototype")
+    gr.Markdown("# CLIHBot - Local AI Assistant")
 
     # Chat Tab
     with gr.Tab("Chat"):
+        # Custom Chatbot (only valid parameters)
+        chatbot = gr.Chatbot(
+            layout="bubble",
+            label="ClihBot",   # ← changed from title
+            height="75vh",                        # recommended for nice size
+            autoscroll=True,                         # auto-scroll to latest message
+            elem_id="chatbot",                         # for custom styling
+            group_consecutive_messages=True  # group messages from the same sender
+        )
+
+        # Custom Textbox
+        textbox = gr.Textbox(
+            placeholder="Type your message here...",
+            scale=2,
+            #container=False
+        )
+        
+        # Chat Interface (this is the main component)
         chat = gr.ChatInterface(
             fn=chat_handler,
-            examples=["What's the weather?", "Debug this code snippet."],  # Placeholders
-            title="AI Conversation (Mock Mode)"
+            chatbot=chatbot,
+            textbox=textbox,
+            title="Conversation",
+            fill_height=True,
+            fill_width=True,
+            submit_btn=True,
+            description="Talk to your local AI assistant",
+            examples=["What's the weather?", "Debug this code snippet.", "Summarize this article.", "What plugins do I have?"],
         )
 
     # Config Tab
